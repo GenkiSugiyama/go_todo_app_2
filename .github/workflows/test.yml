@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - "main"
-  pulll_request:
+  pull_request:
 name: test
 jobs:
   test:
