@@ -22,5 +22,9 @@ CMD ["./app"]
 FROM golang:1.25.4 as dev
 WORKDIR /app
 
+# devコンテナのビルド時に依存関係を自動でダウンロード・インストールするためにgo.modとgo.sumを先にコピーしている
+COPY go.mod go.sum ./
+RUN go mod download
+
 RUN go install github.com/air-verse/air@latest
 CMD ["air"]
