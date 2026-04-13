@@ -75,7 +75,11 @@ func run(ctx context.Context) error {
 	log.Printf("start with: %v\n", url)
 
 	// 別ファイルで定義したハンドラー登録関数を呼び出して、http.Handlerを作成する
-	mux := NewMux()
+	mux, cleanup, err := NewMux(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 	// リスナーとハンドラーをServer構造体に渡して、サーバーを起動する
 	s := NewServer(l, mux)
 	return s.Run(ctx)

@@ -10,7 +10,7 @@ func (r *Repository) ListTasks(ctx context.Context, db Queryer) (entity.Tasks, e
 	tasks := entity.Tasks{}
 	sql := `SELECT
 		id, title, status, created, modified
-		FROM tasks;`
+		FROM task;`
 	if err := db.SelectContext(ctx, &tasks, sql); err != nil {
 		return nil, err
 	}
