@@ -2,12 +2,13 @@ package handler
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/GenkiSugiyama/go_todo_app_2/entity"
-	"github.com/GenkiSugiyama/go_todo_app_2/store"
 	"github.com/GenkiSugiyama/go_todo_app_2/testutil"
 	"github.com/go-playground/validator/v10"
 )
@@ -50,10 +51,18 @@ func TestAddTask(t *testing.T) {
 				bytes.NewReader(testutil.LoadFile(t, tt.reqFile)),
 			)
 
+			// 空のmock構造体を作成し、AddTaskFuncフィールドに実際のメソッドと同じシグネチャの関数を
+			// 追加する。関数の挙動はテストケースごとに変えることができるようにしている
+			moq := &AddTaskServiceMock{}
+			moq.AddTaskFunc = func(ctx context.Context, title string) (*entity.Task, error) {
+				if tt.want.status == http.StatusOK {
+					return &entity.Task{ID: 1}, nil
+				}
+				return nil, errors.New("error from mock")
+			}
+
 			sut := AddTask{
-				Store: &store.TaskStore{
-					Tasks: map[entity.TaskID]*entity.Task{},
-				},
+				Service:   moq,
 				Validator: validator.New(),
 			}
 			sut.ServeHTTP(w, r)
