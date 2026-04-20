@@ -1,18 +1,30 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/GenkiSugiyama/go_todo_app_2/config"
 )
 
 func TestNewMux(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/health", nil)
 
-	sut := NewMux()
+	ctx := context.Background()
+	cf, err := config.New()
+	if err != nil {
+		t.Error("failed to parse config: %w", err)
+	}
+	sut, cleanup, err := NewMux(ctx, cf)
+	if err != nil {
+		t.Error("failed to initialize mux: %w", err)
+	}
+	defer cleanup()
 	sut.ServeHTTP(w, r)
 	resp := w.Result()
 	t.Cleanup(func() { _ = resp.Body.Close() })
