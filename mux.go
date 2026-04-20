@@ -20,12 +20,15 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	// ハンドラの初期化に必要なvalidatorやdb, repositoryの初期化
 	v := validator.New()
 	db, cleanup, err := store.New(ctx, cfg)
 	if err != nil {
 		return nil, cleanup, err
 	}
 	r := &store.Repository{Clocker: clock.RealClocker{}}
+
+	// ハンドラを初期化し、パスとハンドラの処理を紐付けしている
 	at := &handler.AddTask{
 		Service:   &service.AddTask{DB: db, Repo: r},
 		Validator: v,
@@ -35,5 +38,10 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 		Service: &service.ListTask{DB: db, Repo: r},
 	}
 	mux.Get("/tasks", lt.ServeHTTP)
+	ru := &handler.RegisterUser{
+		Service:   &service.RegisterUser{DB: db, Repo: r},
+		Validator: v,
+	}
+	mux.Post("/register", ru.ServeHTTP)
 	return mux, cleanup, nil
 }
