@@ -78,7 +78,7 @@ func (j *JWTer) GenerateToken(ctx context.Context, u entity.User) ([]byte, error
 		return nil, fmt.Errorf("GetToken: failed to build token: %w", err)
 	}
 
-	// jwtトークンとユーザーIDの組み合わせを保存する
+	// 署名前jwtトークン内のjtiフィールドの値（トークンID）とユーザーIDの組み合わせを保存する
 	if err := j.Store.Save(ctx, tok.JwtID(), u.ID); err != nil {
 		return nil, err
 	}
@@ -92,17 +92,75 @@ func (j *JWTer) GenerateToken(ctx context.Context, u entity.User) ([]byte, error
 }
 
 func (j *JWTer) GetToken(ctx context.Context, r *http.Request) (jwt.Token, error) {
-	// HTTPリクエストからjwtを取得する
-	// 別処理でjwt検証を行うためにjwt.WithValidate(false)で期限などのクレーム情報についての検証は無視している
+	// HTTPリクエストをパースしてjwtトークンを取得する
+	// その際公開鍵で署名検証しjwt.Tokenにパースしてjwtトークンを返している
 	token, err := jwt.ParseRequest(r, jwt.WithKey(jwa.RS256, j.PublicKey), jwt.WithValidate(false))
 	if err != nil {
 		return nil, err
 	}
+
+	// jwtトークンの有効期限やストア照合を行いトークンが正しいものかを検証している
 	if err := jwt.Validate(token, jwt.WithClock(j.Clocker)); err != nil {
 		return nil, fmt.Errorf("GetToken: failed to validate token: %w", err)
 	}
 	if _, err := j.Store.Load(ctx, token.JwtID()); err != nil {
 		return nil, fmt.Errorf("GetToken: %q expired: %w", token.JwtID(), err)
 	}
+	// 署名検証と期限検証・ストア照合に成功したjwtトークンを返却する
 	return token, nil
+}
+
+// HTTPリクエストのコンテキストにユーザーIDやロール情報を含めるためのメソッド
+func (j *JWTer) FillContext(r *http.Request) (*http.Request, error) {
+	// 渡されたHTTPリクエストからjwtトークンを取得
+	token, err := j.GetToken(r.Context(), r)
+	if err != nil {
+		return nil, err
+	}
+	// jwtトークンのjtiをキーにユーザーIDを取得
+	uid, err := j.Store.Load(r.Context(), token.JwtID())
+	if err != nil {
+		return nil, err
+	}
+	// ユーザーIDやトークンに含まれるロール情報をこのメソッド内でコンテキストに追加する
+	ctx := SetUserID(r.Context(), uid)
+	ctx = SetRole(ctx, token)
+	clone := r.Clone(ctx)
+	return clone, nil
+}
+
+type userIDKey struct{}
+type roleKey struct{}
+
+func SetUserID(ctx context.Context, uid entity.UserID) context.Context {
+	// context.WithValueで値を設定する際のkey情報はstruct{}で定義したDefined Typeを使用する
+	return context.WithValue(ctx, userIDKey{}, uid)
+}
+
+func GetUserID(ctx context.Context) (entity.UserID, bool) {
+	id, ok := ctx.Value(userIDKey{}).(entity.UserID)
+	return id, ok
+}
+
+func SetRole(ctx context.Context, tok jwt.Token) context.Context {
+	// GenerateTokenでのjwtトークン生成時に"role"クレームにユーザーのロール情報が追加されているのでそれを取得
+	get, ok := tok.Get(RoleKey)
+	if !ok {
+		return context.WithValue(ctx, roleKey{}, "")
+	}
+	// jwtトークンからロール情報が取得できればコンテキストにセットする
+	return context.WithValue(ctx, roleKey{}, get)
+}
+
+func GetRole(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(roleKey{}).(string)
+	return role, ok
+}
+
+func IsAdmin(ctx context.Context) bool {
+	role, ok := GetRole(ctx)
+	if !ok {
+		return false
+	}
+	return role == "admin"
 }
