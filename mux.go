@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/GenkiSugiyama/go_todo_app_2/auth"
 	"github.com/GenkiSugiyama/go_todo_app_2/clock"
 	"github.com/GenkiSugiyama/go_todo_app_2/config"
 	"github.com/GenkiSugiyama/go_todo_app_2/handler"
@@ -26,7 +27,26 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 	if err != nil {
 		return nil, cleanup, err
 	}
+	clocker := clock.RealClocker{}
 	r := &store.Repository{Clocker: clock.RealClocker{}}
+
+	rcli, err := store.NewKVS(ctx, cfg)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	jwter, err := auth.NewJWTer(rcli, clocker)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	l := &handler.Login{
+		Service: &service.Login{
+			DB:             db,
+			Repo:           r,
+			TokenGenerator: jwter,
+		},
+		Validator: v,
+	}
+	mux.Post("/login", l.ServeHTTP)
 
 	// ハンドラを初期化し、パスとハンドラの処理を紐付けしている
 	at := &handler.AddTask{
