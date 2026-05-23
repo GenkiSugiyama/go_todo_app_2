@@ -6,13 +6,13 @@ import (
 	"github.com/GenkiSugiyama/go_todo_app_2/entity"
 )
 
-func (r *Repository) ListTasks(ctx context.Context, db Queryer, id entity.UserID) (entity.Tasks, error) {
+func (r *Repository) ListTasks(ctx context.Context, db Queryer, user_id entity.UserID) (entity.Tasks, error) {
 	tasks := entity.Tasks{}
 	sql := `SELECT
 		id, user_id, title, status, created, modified
 		FROM task
 		WHERE user_id = ?;`
-	if err := db.SelectContext(ctx, &tasks, sql, id); err != nil {
+	if err := db.SelectContext(ctx, &tasks, sql, user_id); err != nil {
 		return nil, err
 	}
 	return tasks, nil
