@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/GenkiSugiyama/go_todo_app_2/auth"
 	"github.com/GenkiSugiyama/go_todo_app_2/entity"
 	"github.com/GenkiSugiyama/go_todo_app_2/store"
 )
@@ -14,7 +15,12 @@ type AddTask struct {
 }
 
 func (a *AddTask) AddTask(ctx context.Context, title string) (*entity.Task, error) {
+	userID, ok := auth.GetUserID(ctx)
+	if !ok {
+		return nil, fmt.Errorf("user_id not found")
+	}
 	t := &entity.Task{
+		UserID: userID,
 		Title:  title,
 		Status: entity.TaskStatusTodo,
 	}
